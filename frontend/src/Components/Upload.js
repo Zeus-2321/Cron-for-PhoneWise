@@ -4,6 +4,7 @@ import { Button, Container, Typography, TextField } from '@mui/material';
 
 const Upload = () => {
   const [file, setFile] = useState(null);
+  const url = 'https://test-r4y3.onrender.com/api/upload';
 
   const handleFileChange = (event) => {
     setFile(event.target.files[0]);
@@ -14,7 +15,7 @@ const Upload = () => {
       const formData = new FormData();
       formData.append('attendanceFile', file);
 
-      const response = await axios.post('/api/upload', formData, {
+      const response = await axios.post(url, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },

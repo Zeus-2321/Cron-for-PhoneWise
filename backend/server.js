@@ -2,12 +2,14 @@ const express = require('express');
 const fileUpload = require('express-fileupload');
 const fs = require('fs');
 const Attendance = require('./db');
+const cors = require('cors')
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 app.use(express.json());
 app.use(fileUpload());
+app.use(cors());
 
 app.post('/api/upload', (req, res) => {
   if (!req.files || !req.files.attendanceFile) {
