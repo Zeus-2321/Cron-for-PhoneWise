@@ -1,53 +1,63 @@
 const express = require('express');
-const fileUpload = require('express-fileupload');
-const fs = require('fs');
-const Attendance = require('./db');
-const cors = require('cors')
-
 const app = express();
-const PORT = process.env.PORT || 5000;
+const port = 5000 || process.env.PORT;
+const axios = require('axios');
+const Phone = require('./models/Phone');
+const apiUrl = 'https://phone-specs-api.vercel.app';
+const mongoose = require('mongoose');
+const cron = require('node-cron');
 
-app.use(express.json());
-app.use(fileUpload());
-app.use(cors());
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
-app.post('/api/upload', (req, res) => {
-  if (!req.files || !req.files.attendanceFile) {
-    return res.status(400).json({ error: 'No file uploaded' });
-  }
+const db = mongoose.connection;
+db.on('error', console.error.bind(console, 'MongoDB connection error:'));
+db.once('open', () => {
+  console.log('MongoDB connected!');
+});
 
-  const { attendanceFile } = req.files;
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
+});
 
-  if (attendanceFile.mimetype !== 'text/plain') {
-    return res.status(400).json({ error: 'Invalid file format' });
-  }
+async function fetchAndSavePhones() {
+  try {
+    // Fetch list of brands
+    const brandsResponse = await axios.get(`${apiUrl}/brands`);
 
-  fs.readFile(attendanceFile.tempFilePath, 'utf-8', (err, data) => {
-    if (err) {
-      console.error('Error reading file', err);
-      return res.status(500).json({ error: 'Error reading file' });
+    // Fetch phones for each brand
+    for (const brand of brandsResponse.data.data) {
+      let currentPage = 1;
+      let totalPages = 1;
+
+      while (currentPage <= totalPages) {
+        const phonesResponse = await axios.get(`${apiUrl}/brands/${brand.brand_slug}?page=${currentPage}`);
+
+        // Save phones and phone specs to MongoDB
+        for (const phone of phonesResponse.data.data.phones) {
+          const existingPhone = await Phone.findOne({ slug: phone.slug });
+
+          if (!existingPhone) {
+            // Save phone to database
+            const newPhone = new Phone(phone);
+            await newPhone.save();
+            console.log(`Saved phone: ${phone.slug}`);
+          } else {
+            console.log(`Phone already exists: ${phone.slug}`);
+          }
+        }
+        currentPage++;
+        totalPages = phonesResponse.data.data.last_page;
+      }
     }
+  } catch (error) {
+    console.error(error);
+  }
+}
 
-    const lines = data.split('\n');
+// Schedule the job to run every week on Sunday at 00:00
+cron.schedule('0 0 * * 0', fetchAndSavePhones);
 
-    const attendanceData = lines.map((line) => line.trim().split(','));
-
-    const attendanceRecords = attendanceData.map(([timestamp, studentId]) => ({
-      timestamp,
-      studentId,
-    }));
-
-    Attendance.insertMany(attendanceRecords)
-      .then(() => {
-        res.json({ message: 'Attendance data saved successfully' });
-      })
-      .catch((err) => {
-        console.error('Error saving attendance data', err);
-        res.status(500).json({ error: 'Error saving attendance data' });
-      });
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
+console.log('Job scheduled to run every week');
