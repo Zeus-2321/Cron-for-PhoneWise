@@ -61,8 +61,6 @@ async function fetchAndSavePhones() {
   }
 }
 
-fetchAndSavePhones();
-
 // Schedule the job to run every week on Sunday at 00:00
 cron.schedule('0 0 * * 0', fetchAndSavePhones);
 
