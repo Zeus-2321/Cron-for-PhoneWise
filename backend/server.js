@@ -22,6 +22,16 @@ app.get('/', (req, res) => {
   res.send('Welcome to the API!');
 });
 
+app.get('/run-job', async (req, res) => {
+  try {
+    await fetchAndSavePhones();
+    res.send('Job Completed');
+  } catch (error) {
+    console.error(error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
 });
